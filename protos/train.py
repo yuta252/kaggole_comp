@@ -2,7 +2,8 @@ import pandas as pd
 import numpy as np
 from logging import StreamHandler, DEBUG, Formatter, FileHandler, getLogger
 from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, ParameterGrid
+
 from sklearn.metrics import mean_squared_error, r2_score
 
 from load_data import load_train_data, load_test_data
@@ -39,34 +40,49 @@ if __name__ == '__main__':
 
     logger.info('data preparation end{}'.format(x_train.shape))
 
-    # Cross Validation
+    
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+    # parameter Search
+    all_params = {'fit_intercept': [True, False]}
+    max_score = 0
+    max_prams = None
 
-    list_mse_score = []
-    list_r2_score = []
+    for params in ParameterGrid(all_params):
+        logger.info('params: {}'.format(params))
 
-    for train_idx, valid_idx in cv.split(x_train_feature, y_train):
-        trn_x = x_train_feature[train_idx]
-        val_x = x_train_feature[valid_idx]
+        list_mse_score = []
+        list_r2_score = []
+        # Cross validation
+        for train_idx, valid_idx in cv.split(x_train_feature, y_train):
+            trn_x = x_train_feature[train_idx]
+            val_x = x_train_feature[valid_idx]
 
-        trn_y = y_train[train_idx]
-        val_y = y_train[valid_idx]
+            trn_y = y_train[train_idx]
+            val_y = y_train[valid_idx]
 
-        clf = LinearRegression()
-        clf.fit(trn_x, trn_y)
-    
-        # validation
-        pred = clf.predict(val_x)
-        sc_mse = mean_squared_error(val_y, pred)
-        sc_r2 = r2_score(val_y, pred)
+            clf = LinearRegression(**params)
+            clf.fit(trn_x, trn_y)
+        
+            # validation
+            pred = clf.predict(val_x)
+            sc_mse = mean_squared_error(val_y, pred)
+            sc_r2 = r2_score(val_y, pred)
 
-        list_mse_score.append(sc_mse)
-        list_r2_score.append(sc_r2)
-        logger.debug('    MSE:{}, R2:{}'.format(sc_mse, sc_r2))
-    
-    logger.info('MSE:{}, R2:{}'.format(np.mean(list_mse_score), np.mean(list_r2_score)))
+            list_mse_score.append(sc_mse)
+            list_r2_score.append(sc_r2)
+            logger.debug('    MSE:{}, R2:{}'.format(sc_mse, sc_r2))
+        sc_mse = np.mean(list_mse_score)
+        sc_r2 = np.mean(list_r2_score)
+        if sc_r2 > max_score:
+            max_score = sc_r2
+            max_params = params
+        logger.info('MSE:{}, R2:{}'.format(sc_mse, sc_r2)) 
+        logger.info('current max R2: {}, params: {}'.format(max_score, max_params))
 
-    clf = LinearRegression()
+    logger.info('maximum params: {}'.format(max_params))
+    logger.info('maximum R2: {}'.format(max_score))
+
+    clf = LinearRegression(**max_params)
     clf.fit(x_train_feature, y_train)
 
     logger.info('train end')
