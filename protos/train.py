@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 from logging import StreamHandler, DEBUG, Formatter, FileHandler, getLogger
 from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import StratifiedKFold
+from sklearn.metrics import mean_squared_error, r2_score
 
 from load_data import load_train_data, load_test_data
 
@@ -36,6 +38,33 @@ if __name__ == '__main__':
     # logger.info('train columns: {}{}'.format(use_cols.shape, use_cols))
 
     logger.info('data preparation end{}'.format(x_train.shape))
+
+    # Cross Validation
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+
+    list_mse_score = []
+    list_r2_score = []
+
+    for train_idx, valid_idx in cv.split(x_train_feature, y_train):
+        trn_x = x_train_feature[train_idx]
+        val_x = x_train_feature[valid_idx]
+
+        trn_y = y_train[train_idx]
+        val_y = y_train[valid_idx]
+
+        clf = LinearRegression()
+        clf.fit(trn_x, trn_y)
+    
+        # validation
+        pred = clf.predict(val_x)
+        sc_mse = mean_squared_error(val_y, pred)
+        sc_r2 = r2_score(val_y, pred)
+
+        list_mse_score.append(sc_mse)
+        list_r2_score.append(sc_r2)
+        logger.debug('    MSE:{}, R2:{}'.format(sc_mse, sc_r2))
+    
+    logger.info('MSE:{}, R2:{}'.format(np.mean(list_mse_score), np.mean(list_r2_score)))
 
     clf = LinearRegression()
     clf.fit(x_train_feature, y_train)
